@@ -9,18 +9,18 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 
 interface Env {
-  // Bindings
-  DB: D1Database;
-  STORAGE: R2Bucket;
-  KV: KVNamespace;
-  NOTIFY_QUEUE: Queue;
+  // Bindings (optional during deployment)
+  DB?: D1Database;
+  STORAGE?: R2Bucket;
+  KV?: KVNamespace;
+  NOTIFY_QUEUE?: Queue;
 
   // Environment variables
   DOMAIN: string;
   DASHBOARD_ORIGIN: string;
   MAIN_APP_ORIGIN: string;
 
-  // Secrets (set via wrangler secret put)
+  // Secrets (set via wrangler secret put - optional during deployment)
   CLERK_SECRET_KEY?: string;
   VITE_CLERK_PUBLISHABLE_KEY?: string;
   RESEND_API_KEY?: string;
@@ -48,20 +48,46 @@ app.use("*", cors({
 
 // Health check (no auth required)
 app.get("/health", async (c) => {
-  // Quick binding checks
+  // Safe binding checks - handle optional bindings gracefully
   let dbOk = false;
-  let kvOk = false;
+  let kvOk = false; 
   let queueOk = false;
-  try { await c.env.DB.prepare("SELECT 1").first(); dbOk = true; } catch {}
-  try { await c.env.KV.get("__health__"); kvOk = true; } catch {}
-  try { queueOk = !!c.env.NOTIFY_QUEUE; } catch {}
+  
+  try { 
+    if (c.env.DB) {
+      await c.env.DB.prepare("SELECT 1").first(); 
+      dbOk = true; 
+    }
+  } catch {}
+  
+  try { 
+    if (c.env.KV) {
+      await c.env.KV.get("__health__"); 
+      kvOk = true;
+    } 
+  } catch {}
+  
+  try { 
+    queueOk = !!c.env.NOTIFY_QUEUE; 
+  } catch {}
+
+  const bindingsConfigured = [
+    c.env.DB ? 'DB' : null,
+    c.env.STORAGE ? 'STORAGE' : null, 
+    c.env.KV ? 'KV' : null,
+    c.env.NOTIFY_QUEUE ? 'QUEUE' : null
+  ].filter(Boolean);
 
   return c.json({ 
     status: "ok", 
     version: "1.0.0", 
     service: "nfluencer-admin",
     timestamp: new Date().toISOString(),
-    bindings: { db: dbOk, kv: kvOk, storage: !!c.env.STORAGE, queue: queueOk }
+    bindings: { 
+      configured: bindingsConfigured,
+      functional: { db: dbOk, kv: kvOk, storage: !!c.env.STORAGE, queue: queueOk }
+    },
+    note: bindingsConfigured.length === 0 ? "Bindings should be configured via Cloudflare Dashboard" : undefined
   });
 });
 

@@ -2,33 +2,16 @@
 #
 # Admin API microservice for nfluencer.co
 #
-# Dev:        npm run dev               → http://localhost:8788
+# Dev:        npm run dev               → http://localhost:8788 
 # Deploy:     npm run deploy
+# 
+# Note: Bindings (D1, R2, KV, Queue) are configured via Cloudflare Dashboard
+# rather than hardcoded in wrangler.toml to support both dev and production.
 
 name = "nfluencer-admin"
 main = "src/index.ts"
 compatibility_date = "2025-09-01"
 compatibility_flags = ["nodejs_compat"]
-
-[[d1_databases]]
-binding = "DB"
-database_name = "creator-platform-dev-database"
-database_id = "17596f40-214e-4159-aef9-d3c39a6a0731"
-preview_database_id = "17596f40-214e-4159-aef9-d3c39a6a0731"
-
-[[r2_buckets]]
-binding = "STORAGE"
-bucket_name = "creator-platform-dev-bucket"
-preview_bucket_name = "creator-platform-dev-bucket"
-
-[[kv_namespaces]]
-binding = "KV"
-id = "c312213fa3fb42f7b7f05d084683e69e"
-preview_id = "c312213fa3fb42f7b7f05d084683e69e"
-
-[[queues.producers]]
-binding = "NOTIFY_QUEUE"
-queue = "creator-platform-notifications"
 
 [vars]
 DOMAIN = "nfluencer.co"
