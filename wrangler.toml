@@ -39,9 +39,8 @@ MAIN_APP_ORIGIN = "https://www.nfluencer.co"
 
 [env.production]
 name = "nfluencer-admin-production"
-routes = [
-  { pattern = "api-admin.nfluencer.co", custom_domain = true }
-]
+# Custom domain configured manually in Cloudflare dashboard after first deploy:
+# api-admin.nfluencer.co → Workers & Pages → Custom Domains
 
 [[env.production.d1_databases]]
 binding = "DB"

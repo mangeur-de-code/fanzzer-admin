@@ -27,9 +27,9 @@ jobs:
       - name: TypeScript check
         run: npm run build
 
-      - name: Deploy to Cloudflare Workers (production)
+      - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --env production
+          command: deploy
