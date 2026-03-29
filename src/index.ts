@@ -2,52 +2,93 @@
  * admin-service/src/index.ts
  *
  * Main entry point for the nfluencer admin Hono microservice.
- * All 29 admin endpoints are mounted under /api/v1/admin/*.
+ * Minimal version for initial deployment testing.
  */
 
 import { Hono } from "hono";
-import type { Env } from "./types";
-import { applyCorsHeaders } from "./lib/utils";
+import { cors } from "hono/cors";
 
-// Route handlers
-import { auditLogRoute } from "./routes/audit-log";
-import { banUserRoute } from "./routes/ban-user";
-import { clearCacheRoute } from "./routes/clear-cache";
-import { contentRoute } from "./routes/content";
-import { creatorsRoute } from "./routes/creators";
-import { deleteUserRoute } from "./routes/delete-user";
-import { dismissReportRoute } from "./routes/dismiss-report";
-import { meRoute } from "./routes/me";
-import { moderateContentRoute } from "./routes/moderate-content";
-import { moderationRoute } from "./routes/moderation";
-import { notificationsRoute } from "./routes/notifications";
-import { overviewRoute } from "./routes/overview";
-import { preferencesRoute } from "./routes/preferences";
-import { promoteUserRoute } from "./routes/promote-user";
-import { reportsRoute } from "./routes/reports";
-import { resolveReportRoute } from "./routes/resolve-report";
-import { revenueRoute } from "./routes/revenue";
-import { searchRoute } from "./routes/search";
-import { settingsRoute } from "./routes/settings";
-import { streamsRoute } from "./routes/streams";
-import { subscriptionsRoute } from "./routes/subscriptions";
-import { systemRoute } from "./routes/system";
-import { usersRoute } from "./routes/users";
-import { verifyCreatorRoute } from "./routes/verify-creator";
+interface Env {
+  // Bindings (wrangler.toml)
+  DB: D1Database;
+  STORAGE: R2Bucket;
+  KV: KVNamespace;
+  NOTIFY_QUEUE: Queue;
 
-type Variables = { adminUser: import("./lib/auth").AdminUser };
+  // Environment variables
+  DOMAIN: string;
+  DASHBOARD_ORIGIN: string;
+  MAIN_APP_ORIGIN: string;
 
-const app = new Hono<{ Bindings: Env; Variables: Variables }>();
+  // Secrets (set via wrangler secret put)
+  CLERK_SECRET_KEY: string;
+  VITE_CLERK_PUBLISHABLE_KEY: string;
+  RESEND_API_KEY: string;
+}
 
-// Global OPTIONS preflight handler (handles all /api/v1/admin/* routes)
-app.options("*", (c) => {
-  applyCorsHeaders(c);
-  return c.body(null, 204);
-});
+const app = new Hono<{ Bindings: Env }>();
+
+// CORS configuration
+app.use("*", cors({
+  origin: (origin, c) => {
+    const allowedOrigins = [
+      "http://localhost:5175", // Dashboard dev
+      "https://dashboard.nfluencer.co", // Dashboard production
+      "https://www.nfluencer.co", // Main app
+      c.env?.DASHBOARD_ORIGIN,
+      c.env?.MAIN_APP_ORIGIN
+    ].filter(Boolean);
+    
+    return allowedOrigins.includes(origin) ? origin : null;
+  },
+  allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+}));
 
 // Health check (no auth required)
 app.get("/health", (c) => {
-  return c.json({ status: "ok", version: "1.0.0", service: "nfluencer-admin" });
+  return c.json({ 
+    status: "ok", 
+    version: "1.0.0", 
+    service: "nfluencer-admin",
+    timestamp: new Date().toISOString()
+  });
+});
+
+// API v1 placeholder routes
+app.get("/api/v1/admin/me", (c) => {
+  return c.json({
+    message: "Admin service is running", 
+    endpoint: "/api/v1/admin/me",
+    todo: "Authentication will be implemented next"
+  });
+});
+
+app.get("/api/v1/admin/overview", (c) => {
+  return c.json({
+    message: "Admin service is running",
+    endpoint: "/api/v1/admin/overview", 
+    todo: "Dashboard metrics will be implemented next"
+  });
+});
+
+// Catch-all for other admin routes
+app.all("/api/v1/admin/*", (c) => {
+  return c.json({
+    message: "Admin endpoint placeholder",
+    path: c.req.path,
+    method: c.req.method,
+    todo: "Full admin endpoints will be implemented in Phase 2"
+  });
+});
+
+// Default 404
+app.all("*", (c) => {
+  return c.json({ error: "Not found", path: c.req.path }, 404);
+});
+
+export default app;
 });
 
 // Mount all admin routes under /api/v1/admin
