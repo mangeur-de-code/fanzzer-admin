@@ -9,21 +9,15 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 
 interface Env {
-  // Bindings (wrangler.toml)
-  DB: D1Database;
-  STORAGE: R2Bucket;
-  KV: KVNamespace;
-  NOTIFY_QUEUE: Queue;
-
   // Environment variables
   DOMAIN: string;
   DASHBOARD_ORIGIN: string;
   MAIN_APP_ORIGIN: string;
 
-  // Secrets (set via wrangler secret put)
-  CLERK_SECRET_KEY: string;
-  VITE_CLERK_PUBLISHABLE_KEY: string;
-  RESEND_API_KEY: string;
+  // Secrets (to be added via wrangler secret put)
+  CLERK_SECRET_KEY?: string;
+  VITE_CLERK_PUBLISHABLE_KEY?: string;
+  RESEND_API_KEY?: string;
 }
 
 const app = new Hono<{ Bindings: Env }>();
