@@ -13,6 +13,7 @@ interface Env {
   DB: D1Database;
   STORAGE: R2Bucket;
   KV: KVNamespace;
+  NOTIFY_QUEUE: Queue;
 
   // Environment variables
   DOMAIN: string;

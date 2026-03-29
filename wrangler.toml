@@ -26,6 +26,10 @@ binding = "KV"
 id = "c312213fa3fb42f7b7f05d084683e69e"
 preview_id = "c312213fa3fb42f7b7f05d084683e69e"
 
+[[queues.producers]]
+binding = "NOTIFY_QUEUE"
+queue = "creator-platform-notifications"
+
 [vars]
 DOMAIN = "nfluencer.co"
 DASHBOARD_ORIGIN = "https://dashboard.nfluencer.co"
