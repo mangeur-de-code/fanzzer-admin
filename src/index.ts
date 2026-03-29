@@ -89,34 +89,3 @@ app.all("*", (c) => {
 });
 
 export default app;
-});
-
-// Mount all admin routes under /api/v1/admin
-const v1 = app.basePath("/api/v1/admin");
-
-v1.route("/audit-log", auditLogRoute);
-v1.route("/ban-user", banUserRoute);
-v1.route("/clear-cache", clearCacheRoute);
-v1.route("/content", contentRoute);
-v1.route("/creators", creatorsRoute);
-v1.route("/delete-user", deleteUserRoute);
-v1.route("/dismiss-report", dismissReportRoute);
-v1.route("/me", meRoute);
-v1.route("/moderate-content", moderateContentRoute);
-v1.route("/moderation", moderationRoute);
-v1.route("/notifications", notificationsRoute);
-v1.route("/overview", overviewRoute);
-v1.route("/preferences", preferencesRoute);
-v1.route("/promote-user", promoteUserRoute);
-v1.route("/reports", reportsRoute);
-v1.route("/resolve-report", resolveReportRoute);
-v1.route("/revenue", revenueRoute);
-v1.route("/search", searchRoute);
-v1.route("/settings", settingsRoute);
-v1.route("/streams", streamsRoute);
-v1.route("/subscriptions", subscriptionsRoute);
-v1.route("/system", systemRoute);
-v1.route("/users", usersRoute);
-v1.route("/verify-creator", verifyCreatorRoute);
-
-export default app;
