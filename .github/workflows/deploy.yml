@@ -22,7 +22,10 @@ jobs:
           cache: "npm"
 
       - name: Install dependencies
-        run: npm ci --no-audit --no-fund
+        run: npm install
+
+      - name: TypeScript check
+        run: npm run build
 
       - name: Deploy to Cloudflare Workers (production)
         uses: cloudflare/wrangler-action@v3
@@ -30,8 +33,3 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy --env production
-        env:
-          # Secrets are configured via wrangler secret put in the admin service
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}

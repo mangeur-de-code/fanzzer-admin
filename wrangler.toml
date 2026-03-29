@@ -28,6 +28,15 @@ binding = "KV"
 id = "c312213fa3fb42f7b7f05d084683e69e"
 preview_id = "c312213fa3fb42f7b7f05d084683e69e"
 
+[[queues.producers]]
+binding = "NOTIFY_QUEUE"
+queue = "creator-platform-notifications"
+
+[vars]
+DOMAIN = "nfluencer.co"
+DASHBOARD_ORIGIN = "https://dashboard.nfluencer.co"
+MAIN_APP_ORIGIN = "https://www.nfluencer.co"
+
 [env.production]
 name = "nfluencer-admin-production"
 routes = [
@@ -46,3 +55,12 @@ bucket_name = "creator-platform-production-bucket"
 [[env.production.kv_namespaces]]
 binding = "KV"
 id = "8064dd40692840cf896c27c60c87ea20"
+
+[[env.production.queues.producers]]
+binding = "NOTIFY_QUEUE"
+queue = "creator-platform-notifications-production"
+
+[env.production.vars]
+DOMAIN = "nfluencer.co"
+DASHBOARD_ORIGIN = "https://dashboard.nfluencer.co"
+MAIN_APP_ORIGIN = "https://www.nfluencer.co"
