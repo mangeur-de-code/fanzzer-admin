@@ -9,12 +9,6 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 
 interface Env {
-  // Bindings
-  DB: D1Database;
-  STORAGE: R2Bucket;
-  KV: KVNamespace;
-  NOTIFY_QUEUE: Queue;
-
   // Environment variables
   DOMAIN: string;
   DASHBOARD_ORIGIN: string;
@@ -47,19 +41,13 @@ app.use("*", cors({
 }));
 
 // Health check (no auth required)
-app.get("/health", async (c) => {
-  // Quick binding checks
-  let dbOk = false;
-  let kvOk = false;
-  try { await c.env.DB.prepare("SELECT 1").first(); dbOk = true; } catch {}
-  try { await c.env.KV.get("__health__"); kvOk = true; } catch {}
-
+app.get("/health", (c) => {
   return c.json({ 
     status: "ok", 
     version: "1.0.0", 
     service: "nfluencer-admin",
     timestamp: new Date().toISOString(),
-    bindings: { db: dbOk, kv: kvOk, storage: !!c.env.STORAGE }
+    note: "Bindings will be added via Cloudflare Dashboard"
   });
 });
 
