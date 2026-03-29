@@ -9,12 +9,17 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 
 interface Env {
+  // Bindings
+  DB: D1Database;
+  STORAGE: R2Bucket;
+  KV: KVNamespace;
+
   // Environment variables
   DOMAIN: string;
   DASHBOARD_ORIGIN: string;
   MAIN_APP_ORIGIN: string;
 
-  // Secrets (to be added via wrangler secret put)
+  // Secrets (set via wrangler secret put)
   CLERK_SECRET_KEY?: string;
   VITE_CLERK_PUBLISHABLE_KEY?: string;
   RESEND_API_KEY?: string;
@@ -41,12 +46,19 @@ app.use("*", cors({
 }));
 
 // Health check (no auth required)
-app.get("/health", (c) => {
+app.get("/health", async (c) => {
+  // Quick binding checks
+  let dbOk = false;
+  let kvOk = false;
+  try { await c.env.DB.prepare("SELECT 1").first(); dbOk = true; } catch {}
+  try { await c.env.KV.get("__health__"); kvOk = true; } catch {}
+
   return c.json({ 
     status: "ok", 
     version: "1.0.0", 
     service: "nfluencer-admin",
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    bindings: { db: dbOk, kv: kvOk, storage: !!c.env.STORAGE }
   });
 });
 
