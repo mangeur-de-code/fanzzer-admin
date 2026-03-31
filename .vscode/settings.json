@@ -1,0 +1,6 @@
+{
+    "sonarlint.connectedMode.project": {
+        "connectionId": "mysonar",
+        "projectKey": "mangeur-de-code_fanzzer-admin"
+    }
+}

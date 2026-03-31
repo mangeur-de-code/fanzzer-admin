@@ -6,18 +6,23 @@
  */
 
 export interface Env {
-  // Bindings (wrangler.toml)
-  DB: D1Database;
-  STORAGE: R2Bucket;
-  KV: KVNamespace;
+  // Bindings (wrangler.toml) - optional during deployment
+  DB?: D1Database;
+  STORAGE?: R2Bucket;
+  KV?: KVNamespace;
+  NOTIFY_QUEUE?: Queue;
 
-  // Secrets
-  CLERK_SECRET_KEY: string;
-  VITE_CLERK_PUBLISHABLE_KEY: string;
-  RESEND_API_KEY: string;
+  // Environment variables
+  DOMAIN?: string;
+  DASHBOARD_ORIGIN?: string;
+  MAIN_APP_ORIGIN?: string;
+
+  // Secrets (optional during deployment)
+  CLERK_SECRET_KEY?: string;
+  VITE_CLERK_PUBLISHABLE_KEY?: string;
+  RESEND_API_KEY?: string;
 
   // Vars
   ENVIRONMENT?: "development" | "production";
-  DASHBOARD_ORIGIN?: string;
   ADMIN_ALLOWED_ORIGINS?: string;
 }

@@ -3,20 +3,20 @@
 // Modified to make bindings optional for deployment flexibility
 
 interface CloudflareBindings {
-	// Bindings (configured via Cloudflare Dashboard - optional during deployment)
-	DB?: D1Database;
-	STORAGE?: R2Bucket;
-	KV?: KVNamespace;
-	NOTIFY_QUEUE?: Queue<unknown>;
-	
-	// Environment variables
-	DOMAIN: string;
-	DASHBOARD_ORIGIN: string;
-	MAIN_APP_ORIGIN: string;
-	
-	// Secrets (set via wrangler secret put - optional during deployment)
-	CLERK_SECRET_KEY?: string;
-	STRIPE_SECRET_KEY?: string;
-	RESEND_API_KEY?: string;
-	VITE_CLERK_PUBLISHABLE_KEY?: string;
+    // Bindings (configured via Cloudflare Dashboard - optional during deployment)
+    DB?: D1Database;
+    STORAGE?: R2Bucket;
+    KV?: KVNamespace;
+    NOTIFY_QUEUE?: Queue<unknown>;
+
+    // Environment variables
+    DOMAIN: string;
+    DASHBOARD_ORIGIN: string;
+    MAIN_APP_ORIGIN: string;
+
+    // Secrets (set via wrangler secret put - optional during deployment)
+    CLERK_SECRET_KEY?: string;
+    STRIPE_SECRET_KEY?: string;
+    RESEND_API_KEY?: string;
+    VITE_CLERK_PUBLISHABLE_KEY?: string;
 }
