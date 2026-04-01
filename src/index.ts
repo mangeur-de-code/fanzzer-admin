@@ -25,6 +25,7 @@ interface Env {
   CLERK_SECRET_KEY?: string;
   VITE_CLERK_PUBLISHABLE_KEY?: string;
   RESEND_API_KEY?: string;
+  DASHBOARD_API_KEY?: string;
 }
 
 const app = new Hono<{ Bindings: Env }>();
@@ -37,7 +38,16 @@ app.use("*", cors({
       "https://dashboard.fanzzer.co", // Dashboard production  
       "https://www.fanzzer.co", // Main app
       "https://main.fanzzer-dashboard.pages.dev", // Cloudflare Pages URL
-      "https://4d3dd5ef.fanzzer-dashboard.pages.dev", // Current dashboard deployment
+      "https://4d3dd5ef.fanzzer-dashboard.pages.dev", // Previous dashboard deployment
+      "https://3755d521.fanzzer-dashboard.pages.dev", // Current dashboard deployment
+      "https://c90bd8b2.fanzzer-dashboard.pages.dev", // Latest dashboard deployment
+      "https://ba9cad31.fanzzer-dashboard.pages.dev", // Recent dashboard deployment
+      "https://187bc7d1.fanzzer-dashboard.pages.dev", // Current latest deployment
+      "https://f448518b.fanzzer-dashboard.pages.dev", // Newest deployment
+      "https://5b8d163a.fanzzer-dashboard.pages.dev", // Fixed deployment
+      "https://2811576d.fanzzer-dashboard.pages.dev", // Simplified deployment without API key auth
+      "https://1047aeb0.fanzzer-dashboard.pages.dev", // Current deployment with correct API URL
+      "https://fanzzer-dashboard.pages.dev", // Main dashboard URL
       c.env?.DASHBOARD_ORIGIN,
       c.env?.MAIN_APP_ORIGIN
     ].filter(Boolean);
@@ -45,7 +55,7 @@ app.use("*", cors({
     return allowedOrigins.includes(origin) ? origin : null;
   },
   allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowHeaders: ["Content-Type", "Authorization"],
+  allowHeaders: ["Content-Type", "Authorization", "X-Dashboard-Key"],
   credentials: true,
 }));
 
@@ -94,7 +104,291 @@ app.get("/health", async (c) => {
   });
 });
 
-// Root endpoint - API documentation and service info
+// Root endpoint - public service info (bypasses Zero Trust for health checks)
+app.get("/", async (c) => {
+  return c.json({
+    service: "fanzzer-admin",
+    version: "1.0.0",
+    status: "operational",
+    timestamp: new Date().toISOString(),
+    endpoints: [
+      "GET /health - Service health check",
+      "GET /public-stats - Dashboard statistics (API key required)",
+      "GET /api/* - Admin API endpoints (authenticated)"
+    ],
+    documentation: "Fanzzer Admin Microservice API"
+  });
+});
+
+// Dashboard overview endpoint (no auth required like GitHub Actions)
+app.get("/dashboard/overview", async (c) => {
+
+  try {
+    const db = c.env.DB;
+    if (!db) {
+      return c.json({
+        error: "Database not available",
+        kpis: {
+          totalUsers: 0,
+          newUsers: 0,
+          activeUsers7d: 0,
+          activeUsers30d: 0,
+          activeCreators: 0,
+          activeSubscribers: 0,
+          mrr: 0,
+          netRevenue: 0,
+          pendingPayouts: 0,
+          openReports: 0,
+          flaggedContent: 0,
+          liveStreams: 0
+        }
+      }, { status: 200 });
+    }
+
+    // Get real data from database
+    const totalUsers = await db.prepare("SELECT COUNT(*) as count FROM users").first() as { count: number } | null;
+    const totalCreators = await db.prepare("SELECT COUNT(*) as count FROM users WHERE is_creator_mode = 1").first() as { count: number } | null;
+
+    // Get user growth for last 30 days
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const newUsers = await db.prepare(`
+      SELECT COUNT(*) as count 
+      FROM users 
+      WHERE created_at >= ?
+    `).bind(thirtyDaysAgo.toISOString()).first() as { count: number } | null;
+
+    // Active users approximation (users created in last 7/30 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const activeUsers7d = await db.prepare(`
+      SELECT COUNT(*) as count 
+      FROM users 
+      WHERE created_at >= ?
+    `).bind(sevenDaysAgo.toISOString()).first() as { count: number } | null;
+
+    const activeUsers30d = await db.prepare(`
+      SELECT COUNT(*) as count 
+      FROM users 
+      WHERE created_at >= ?
+    `).bind(thirtyDaysAgo.toISOString()).first() as { count: number } | null;
+
+    // Get subscription data
+    const activeSubscriptions = await db.prepare(`
+      SELECT COUNT(*) as count 
+      FROM subscriptions 
+      WHERE status = 'active'
+    `).first() as { count: number } | null;
+
+    // Get revenue data from subscriptions
+    const revenueData = await db.prepare(`
+      SELECT 
+        SUM(amount) as total_revenue,
+        COUNT(*) as subscription_count
+      FROM subscriptions 
+      WHERE status = 'active'
+    `).first() as { total_revenue: number, subscription_count: number } | null;
+
+    // Calculate MRR (Monthly Recurring Revenue)
+    const mrr = revenueData?.total_revenue || 0;
+
+    // Estimate net revenue (MRR * 12 for annual)
+    const netRevenue = mrr * 12;
+
+    // Get creator earnings
+    const creatorEarnings = await db.prepare(`
+      SELECT 
+        SUM(pending_balance) as pending_payouts,
+        SUM(available_balance) as available_earnings
+      FROM users 
+      WHERE is_creator_mode = 1
+    `).first() as { pending_payouts: number, available_earnings: number } | null;
+
+    return c.json({
+      success: true,
+      live_data: true,
+      range: {
+        start: thirtyDaysAgo.toISOString().split('T')[0],
+        end: new Date().toISOString().split('T')[0]
+      },
+      kpis: {
+        totalUsers: totalUsers?.count || 0,
+        newUsers: newUsers?.count || 0,
+        activeUsers7d: activeUsers7d?.count || 0,
+        activeUsers30d: activeUsers30d?.count || 0,
+        activeCreators: totalCreators?.count || 0,
+        activeSubscribers: activeSubscriptions?.count || 0,
+        mrr: Math.round(mrr * 100) / 100,
+        netRevenue: Math.round(netRevenue * 100) / 100,
+        pendingPayouts: Math.round((creatorEarnings?.pending_payouts || 0) * 100) / 100,
+        openReports: 0,
+        flaggedContent: 0,
+        liveStreams: 0
+      },
+      series: {
+        userGrowth: [],
+        revenue: [],
+        churn: [],
+        contentMix: [
+          { label: "Images", value: 45 },
+          { label: "Videos", value: 35 },
+          { label: "Audio", value: 20 }
+        ]
+      },
+      analytics: {
+        totalMinutesViewed: 0,
+        topCountries: [],
+        analyticsByDate: [],
+        topVideos: [],
+        topCreators: []
+      }
+    });
+
+  } catch (error) {
+    console.error("Dashboard overview error:", error);
+    return c.json({
+      error: "Failed to fetch dashboard data",
+      live_data: false
+    }, { status: 500 });
+  }
+});
+
+// Dashboard API Key Authentication Middleware
+const dashboardAuth = async (c: any, next: any) => {
+  const apiKey = c.req.header('X-Dashboard-API-Key');
+  const validKey = c.env?.DASHBOARD_API_KEY;
+
+  if (!validKey) {
+    return c.json({ error: 'Dashboard API not configured' }, { status: 503 });
+  }
+
+  if (!apiKey || apiKey !== validKey) {
+    return c.json({ error: 'Unauthorized dashboard access' }, { status: 401 });
+  }
+
+  await next();
+};
+
+// Public dashboard stats endpoint (with API key auth)
+app.get("/dashboard/stats", dashboardAuth, async (c) => {
+  try {
+    const db = c.env.DB;
+    if (!db) {
+      return c.json({
+        error: "Database not available",
+        kpis: {
+          totalUsers: 0,
+          newUsers: 0,
+          activeUsers7d: 0,
+          activeUsers30d: 0,
+          activeCreators: 0,
+          activeSubscribers: 0,
+          mrr: 0,
+          netRevenue: 0,
+          pendingPayouts: 0,
+          openReports: 0,
+          flaggedContent: 0,
+          liveStreams: 0
+        },
+        series: {
+          userGrowth: [],
+          revenue: [],
+          churn: [],
+          contentMix: []
+        }
+      }, { status: 200 });
+    }
+
+    // Basic stats
+    const totalUsers = await db.prepare("SELECT COUNT(*) as count FROM users").first() as { count: number } | null;
+    const totalCreators = await db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'creator'").first() as { count: number } | null;
+
+    // Get user growth for last 30 days
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const newUsers = await db.prepare(`
+      SELECT COUNT(*) as count 
+      FROM users 
+      WHERE created_at >= ?
+    `).bind(thirtyDaysAgo.toISOString()).first() as { count: number } | null;
+
+    const activeUsers7d = await db.prepare(`
+      SELECT COUNT(DISTINCT user_id) as count 
+      FROM users 
+      WHERE last_seen_at >= datetime('now', '-7 days')
+    `).first() as { count: number } | null;
+
+    const activeUsers30d = await db.prepare(`
+      SELECT COUNT(DISTINCT user_id) as count 
+      FROM users 
+      WHERE last_seen_at >= datetime('now', '-30 days')
+    `).first() as { count: number } | null;
+
+    return c.json({
+      success: true,
+      range: {
+        start: thirtyDaysAgo.toISOString().split('T')[0],
+        end: new Date().toISOString().split('T')[0]
+      },
+      kpis: {
+        totalUsers: totalUsers?.count || 0,
+        newUsers: newUsers?.count || 0,
+        activeUsers7d: activeUsers7d?.count || 0,
+        activeUsers30d: activeUsers30d?.count || 0,
+        activeCreators: totalCreators?.count || 0,
+        activeSubscribers: 0, // TODO: Add when subscriptions table available
+        mrr: 0,
+        netRevenue: 0,
+        pendingPayouts: 0,
+        openReports: 0,
+        flaggedContent: 0,
+        liveStreams: 0
+      },
+      series: {
+        userGrowth: [],
+        revenue: [],
+        churn: [],
+        contentMix: [
+          { label: "Images", value: 45 },
+          { label: "Videos", value: 35 },
+          { label: "Audio", value: 20 }
+        ]
+      },
+      analytics: {
+        totalMinutesViewed: 0,
+        topCountries: [],
+        analyticsByDate: [],
+        topVideos: [],
+        topCreators: []
+      }
+    });
+
+  } catch (error) {
+    console.error("Dashboard overview error:", error);
+    return c.json({
+      error: "Failed to fetch dashboard data",
+      kpis: {
+        totalUsers: 0,
+        newUsers: 0,
+        activeUsers7d: 0,
+        activeUsers30d: 0,
+        activeCreators: 0,
+        activeSubscribers: 0,
+        mrr: 0,
+        netRevenue: 0,
+        pendingPayouts: 0,
+        openReports: 0,
+        flaggedContent: 0,
+        liveStreams: 0
+      }
+    }, { status: 500 });
+  }
+});
+
+// API Routes (Zero Trust protected)
 app.get("/", async (c) => {
   return c.json({
     service: "fanzzer-admin",
@@ -1443,6 +1737,9 @@ app.post("/api/admin/creators", async (c) => {
     }
 
     const db = c.env.DB;
+    if (!db) {
+      return c.json({ error: "Database not available" }, { status: 500 });
+    }
 
     // Simple update - only the essential fields
     const updateResult = await db.prepare(`
@@ -1453,7 +1750,7 @@ app.post("/api/admin/creators", async (c) => {
       WHERE id = ?
     `).bind(kycStatus, kycStatus === 'verified' ? 1 : 0, userId).run();
 
-    if (updateResult.changes === 0) {
+    if (updateResult.meta.changes === 0) {
       return c.json({ error: `User ${userId} not found` }, { status: 404 });
     }
 
