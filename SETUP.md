@@ -110,6 +110,6 @@ The admin service is properly protected by Cloudflare Zero Trust Access. This me
 
 ## Troubleshooting
 
-- **CORS Issues:** The admin service is configured for fanzzer.co domains
+- **CORS Issues:** The admin service is configured for fanzzer.com domains
 - **Health Check:** Should return 200 OK with service status
 - **Secrets:** Use `npx wrangler secret list` to verify configuration

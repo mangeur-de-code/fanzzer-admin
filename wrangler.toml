@@ -27,6 +27,6 @@ queue = "creator-platform-notifications"
 
 # Environment variables
 [vars]
-DOMAIN = "fanzzer.co"
-DASHBOARD_ORIGIN = "https://dashboard.fanzzer.co"
-MAIN_APP_ORIGIN = "https://www.fanzzer.co"
+DOMAIN = "fanzzer.com"
+DASHBOARD_ORIGIN = "https://dashboard.fanzzer.com"
+MAIN_APP_ORIGIN = "https://www.fanzzer.com"

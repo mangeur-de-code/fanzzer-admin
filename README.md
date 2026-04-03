@@ -1,6 +1,6 @@
 # fanzzer Admin Service
 
-Admin API microservice for the fanzzer.co creator monetization platform.
+Admin API microservice for the fanzzer.com creator monetization platform.
 
 ## Architecture
 
@@ -42,7 +42,7 @@ npm run deploy
 
 Configure in Cloudflare Workers dashboard:
 
-- `DOMAIN` - Main domain (fanzzer.co)
+- `DOMAIN` - Main domain (fanzzer.com)
 - `DASHBOARD_ORIGIN` - Dashboard URL for CORS
 - `MAIN_APP_ORIGIN` - Main app URL for CORS
 

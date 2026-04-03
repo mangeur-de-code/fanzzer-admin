@@ -35,8 +35,8 @@ app.use("*", cors({
   origin: (origin, c) => {
     const allowedOrigins = [
       "http://localhost:5175", // Dashboard dev
-      "https://dashboard.fanzzer.co", // Dashboard production  
-      "https://www.fanzzer.co", // Main app
+      "https://dashboard.fanzzer.com", // Dashboard production  
+      "https://www.fanzzer.com", // Main app
       "https://main.fanzzer-dashboard.pages.dev", // Cloudflare Pages URL
       "https://4d3dd5ef.fanzzer-dashboard.pages.dev", // Previous dashboard deployment
       "https://3755d521.fanzzer-dashboard.pages.dev", // Current dashboard deployment
@@ -395,7 +395,7 @@ app.get("/", async (c) => {
     version: "1.0.0",
     status: "operational",
     timestamp: new Date().toISOString(),
-    description: "Admin API microservice for fanzzer.co creator platform",
+    description: "Admin API microservice for fanzzer.com creator platform",
     endpoints: {
       health: "/health",
       admin: {
