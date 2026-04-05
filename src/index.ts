@@ -55,66 +55,62 @@ app.use("*", cors({
   credentials: true,
 }));
 
-// Health check (no auth required)
-app.get("/health", async (c) => {
-  // Safe binding checks - handle optional bindings gracefully
+// Dashboard API Key Authentication Middleware
+const dashboardAuth = async (c: any, next: any) => {
+  const apiKey = c.req.header('X-Dashboard-API-Key');
+  const validKey = c.env?.DASHBOARD_API_KEY;
+  if (!validKey) return c.json({ error: 'Dashboard API not configured' }, { status: 503 });
+  if (!apiKey || apiKey !== validKey) return c.json({ error: 'Unauthorized' }, { status: 401 });
+  await next();
+};
+
+// Clerk JWT authentication middleware
+const requireAuth = async (c: any, next: any) => {
+  // Let CORS middleware handle OPTIONS preflight — do not block it
+  if (c.req.method === 'OPTIONS') { await next(); return; }
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    return c.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  const token = authHeader.slice(7);
+  const secretKey = c.env?.CLERK_SECRET_KEY as string | undefined;
+  if (!secretKey) return c.json({ error: 'Auth not configured — set CLERK_SECRET_KEY' }, { status: 503 });
+  try {
+    const payload = await verifyToken(token, { secretKey });
+    c.set('clerkUserId', payload.sub);
+    await next();
+  } catch {
+    return c.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+};
+
+// Protect all admin routes
+app.use('/api/admin/*', requireAuth);
+app.use('/api/v1/admin/*', requireAuth);
+
+// Health check — auth required, exposes no service details publicly
+app.get("/health", requireAuth, async (c) => {
   let dbOk = false;
   let kvOk = false;
-  let queueOk = false;
 
   try {
-    if (c.env.DB) {
-      await c.env.DB.prepare("SELECT 1").first();
-      dbOk = true;
-    }
+    if (c.env.DB) { await c.env.DB.prepare("SELECT 1").first(); dbOk = true; }
   } catch { }
 
   try {
-    if (c.env.KV) {
-      await c.env.KV.get("__health__");
-      kvOk = true;
-    }
+    if (c.env.KV) { await c.env.KV.get("__health__"); kvOk = true; }
   } catch { }
-
-  try {
-    queueOk = !!c.env.NOTIFY_QUEUE;
-  } catch { }
-
-  const bindingsConfigured = [
-    c.env.DB ? 'DB' : null,
-    c.env.STORAGE ? 'STORAGE' : null,
-    c.env.KV ? 'KV' : null,
-    c.env.NOTIFY_QUEUE ? 'QUEUE' : null
-  ].filter(Boolean);
 
   return c.json({
     status: "ok",
-    version: "1.0.0",
-    service: "fanzzer-admin",
-    timestamp: new Date().toISOString(),
-    bindings: {
-      configured: bindingsConfigured,
-      functional: { db: dbOk, kv: kvOk, storage: !!c.env.STORAGE, queue: queueOk }
-    },
-    note: bindingsConfigured.length === 0 ? "Bindings should be configured via Cloudflare Dashboard" : undefined
+    db: dbOk,
+    kv: kvOk,
+    queue: !!c.env.NOTIFY_QUEUE,
   });
 });
 
-// Root endpoint - public service info (bypasses Zero Trust for health checks)
-app.get("/", async (c) => {
-  return c.json({
-    service: "fanzzer-admin",
-    version: "1.0.0",
-    status: "operational",
-    timestamp: new Date().toISOString(),
-    endpoints: [
-      "GET /health - Service health check",
-      "GET /public-stats - Dashboard statistics (API key required)",
-      "GET /api/* - Admin API endpoints (authenticated)"
-    ],
-    documentation: "Fanzzer Admin Microservice API"
-  });
-});
+// Root — generic 404, reveals nothing
+app.get("/", (c) => c.json({ error: "Not found" }, 404));
 
 // Dashboard overview endpoint (no auth required like GitHub Actions)
 app.get("/dashboard/overview", async (c) => {
@@ -250,49 +246,6 @@ app.get("/dashboard/overview", async (c) => {
     }, { status: 500 });
   }
 });
-
-// Dashboard API Key Authentication Middleware
-const dashboardAuth = async (c: any, next: any) => {
-  const apiKey = c.req.header('X-Dashboard-API-Key');
-  const validKey = c.env?.DASHBOARD_API_KEY;
-
-  if (!validKey) {
-    return c.json({ error: 'Dashboard API not configured' }, { status: 503 });
-  }
-
-  if (!apiKey || apiKey !== validKey) {
-    return c.json({ error: 'Unauthorized dashboard access' }, { status: 401 });
-  }
-
-  await next();
-};
-
-// Clerk JWT authentication middleware — protects all /api/admin/* and /api/v1/admin/* routes
-const requireAuth = async (c: any, next: any) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader?.startsWith('Bearer ')) {
-    return c.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const token = authHeader.slice(7);
-  const secretKey = c.env?.CLERK_SECRET_KEY as string | undefined;
-
-  if (!secretKey) {
-    return c.json({ error: 'Auth not configured — set CLERK_SECRET_KEY' }, { status: 503 });
-  }
-
-  try {
-    const payload = await verifyToken(token, { secretKey });
-    c.set('clerkUserId', payload.sub);
-    await next();
-  } catch {
-    return c.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-};
-
-// Protect all admin routes
-app.use('/api/admin/*', requireAuth);
-app.use('/api/v1/admin/*', requireAuth);
 
 // Public dashboard stats endpoint (with API key auth)
 app.get("/dashboard/stats", dashboardAuth, async (c) => {

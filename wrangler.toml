@@ -1,5 +1,5 @@
 # fanzzer-admin — Hono Cloudflare Worker
-name = "fanzzer-admin"
+name = "fanzzer-admin-production"
 main = "src/index.ts"
 compatibility_date = "2025-09-01"
 compatibility_flags = ["nodejs_compat"]
@@ -9,56 +9,29 @@ workers_dev = false
 pattern = "api-admin.fanzzer.com"
 custom_domain = true
 
-# Environment variables
-[vars]
-DOMAIN = "fanzzer.com"
-DASHBOARD_ORIGIN = "https://dashboard.fanzzer.com"
-MAIN_APP_ORIGIN = "https://www.fanzzer.com"
-
-# ─── DEV bindings (used by: wrangler dev) ────────────────────────────────────
+# D1 Database
 [[d1_databases]]
 binding = "DB"
 database_name = "creator-platform-production-database"
 database_id = "9ae01b02-4f29-48f3-bcbb-6d278294c460"
 
+# R2 Storage
 [[r2_buckets]]
 binding = "STORAGE"
 bucket_name = "creator-platform-production-bucket"
 
+# KV Namespace (production)
 [[kv_namespaces]]
-binding = "KV"
-id = "c312213fa3fb42f7b7f05d084683e69e"
-
-[[queues.producers]]
-binding = "NOTIFY_QUEUE"
-queue = "creator-platform-notifications"
-
-# ─── PRODUCTION bindings (used by: wrangler deploy) ──────────────────────────
-[env.production]
-workers_dev = false
-
-[[env.production.routes]]
-pattern = "api-admin.fanzzer.com"
-custom_domain = true
-
-[env.production.vars]
-DOMAIN = "fanzzer.com"
-DASHBOARD_ORIGIN = "https://dashboard.fanzzer.com"
-MAIN_APP_ORIGIN = "https://www.fanzzer.com"
-
-[[env.production.d1_databases]]
-binding = "DB"
-database_name = "creator-platform-production-database"
-database_id = "9ae01b02-4f29-48f3-bcbb-6d278294c460"
-
-[[env.production.r2_buckets]]
-binding = "STORAGE"
-bucket_name = "creator-platform-production-bucket"
-
-[[env.production.kv_namespaces]]
 binding = "KV"
 id = "8064dd40692840cf896c27c60c87ea20"
 
-[[env.production.queues.producers]]
+# Queue (production)
+[[queues.producers]]
 binding = "NOTIFY_QUEUE"
 queue = "creator-platform-notifications-production"
+
+# Environment variables
+[vars]
+DOMAIN = "fanzzer.com"
+DASHBOARD_ORIGIN = "https://dashboard.fanzzer.com"
+MAIN_APP_ORIGIN = "https://www.fanzzer.com"
