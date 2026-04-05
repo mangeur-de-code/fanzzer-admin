@@ -272,18 +272,14 @@ const dashboardAuth = async (c: any, next: any) => {
 const requireAuth = async (c: any, next: any) => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader?.startsWith('Bearer ')) {
-    return c.json({ error: 'Unauthorized - missing token' }, { status: 401 });
+    return c.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const token = authHeader.slice(7);
   const secretKey = c.env?.CLERK_SECRET_KEY as string | undefined;
 
   if (!secretKey) {
-    // CLERK_SECRET_KEY not set — allow through in local dev, log a warning
-    console.warn('[requireAuth] CLERK_SECRET_KEY not configured, skipping token verification');
-    c.set('clerkUserId', 'dev-user');
-    await next();
-    return;
+    return c.json({ error: 'Auth not configured — set CLERK_SECRET_KEY' }, { status: 503 });
   }
 
   try {
@@ -291,7 +287,7 @@ const requireAuth = async (c: any, next: any) => {
     c.set('clerkUserId', payload.sub);
     await next();
   } catch {
-    return c.json({ error: 'Unauthorized - invalid or expired token' }, { status: 401 });
+    return c.json({ error: 'Unauthorized' }, { status: 401 });
   }
 };
 
