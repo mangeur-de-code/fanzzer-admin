@@ -7,6 +7,7 @@
 
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { verifyToken } from "@clerk/backend";
 
 // Updated interface matching current bindings
 interface Env {
@@ -33,29 +34,25 @@ const app = new Hono<{ Bindings: Env }>();
 // CORS configuration
 app.use("*", cors({
   origin: (origin, c) => {
+    // Static allow list
     const allowedOrigins = [
-      "http://localhost:5175", // Dashboard dev
-      "https://dashboard.fanzzer.com", // Dashboard production  
-      "https://www.fanzzer.com", // Main app
-      "https://main.fanzzer-dashboard.pages.dev", // Cloudflare Pages URL
-      "https://4d3dd5ef.fanzzer-dashboard.pages.dev", // Previous dashboard deployment
-      "https://3755d521.fanzzer-dashboard.pages.dev", // Current dashboard deployment
-      "https://c90bd8b2.fanzzer-dashboard.pages.dev", // Latest dashboard deployment
-      "https://ba9cad31.fanzzer-dashboard.pages.dev", // Recent dashboard deployment
-      "https://187bc7d1.fanzzer-dashboard.pages.dev", // Current latest deployment
-      "https://f448518b.fanzzer-dashboard.pages.dev", // Newest deployment
-      "https://5b8d163a.fanzzer-dashboard.pages.dev", // Fixed deployment
-      "https://2811576d.fanzzer-dashboard.pages.dev", // Simplified deployment without API key auth
-      "https://1047aeb0.fanzzer-dashboard.pages.dev", // Current deployment with correct API URL
-      "https://fanzzer-dashboard.pages.dev", // Main dashboard URL
+      "http://localhost:5175",              // Dashboard dev (vite default port)
+      "http://localhost:5173",              // Dashboard dev (alt port)
+      "http://localhost:3000",              // Dashboard dev (alt port)
+      "https://dashboard.fanzzer.com",      // Dashboard production
+      "https://www.fanzzer.com",            // Main app
+      "https://fanzzer-dashboard.pages.dev", // Cloudflare Pages (main branch)
       c.env?.DASHBOARD_ORIGIN,
-      c.env?.MAIN_APP_ORIGIN
-    ].filter(Boolean);
+      c.env?.MAIN_APP_ORIGIN,
+    ].filter(Boolean) as string[];
+
+    // Allow any Cloudflare Pages preview deployment for this project
+    if (origin?.endsWith(".fanzzer-dashboard.pages.dev")) return origin;
 
     return allowedOrigins.includes(origin) ? origin : null;
   },
   allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowHeaders: ["Content-Type", "Authorization", "X-Dashboard-Key"],
+  allowHeaders: ["Content-Type", "Authorization", "X-Dashboard-API-Key"],
   credentials: true,
 }));
 
@@ -270,6 +267,37 @@ const dashboardAuth = async (c: any, next: any) => {
 
   await next();
 };
+
+// Clerk JWT authentication middleware — protects all /api/admin/* and /api/v1/admin/* routes
+const requireAuth = async (c: any, next: any) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    return c.json({ error: 'Unauthorized - missing token' }, { status: 401 });
+  }
+
+  const token = authHeader.slice(7);
+  const secretKey = c.env?.CLERK_SECRET_KEY as string | undefined;
+
+  if (!secretKey) {
+    // CLERK_SECRET_KEY not set — allow through in local dev, log a warning
+    console.warn('[requireAuth] CLERK_SECRET_KEY not configured, skipping token verification');
+    c.set('clerkUserId', 'dev-user');
+    await next();
+    return;
+  }
+
+  try {
+    const payload = await verifyToken(token, { secretKey });
+    c.set('clerkUserId', payload.sub);
+    await next();
+  } catch {
+    return c.json({ error: 'Unauthorized - invalid or expired token' }, { status: 401 });
+  }
+};
+
+// Protect all admin routes
+app.use('/api/admin/*', requireAuth);
+app.use('/api/v1/admin/*', requireAuth);
 
 // Public dashboard stats endpoint (with API key auth)
 app.get("/dashboard/stats", dashboardAuth, async (c) => {
