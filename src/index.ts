@@ -22,9 +22,8 @@ interface Env {
   DASHBOARD_ORIGIN?: string;
   MAIN_APP_ORIGIN?: string;
 
-  // Secrets (optional during deployment)
+  // Secrets (set via: npx wrangler secret put <NAME>)
   CLERK_SECRET_KEY?: string;
-  VITE_CLERK_PUBLISHABLE_KEY?: string;
   RESEND_API_KEY?: string;
   DASHBOARD_API_KEY?: string;
 }
@@ -1786,6 +1785,13 @@ app.post("/api/admin/creators", async (c) => {
     console.error("Error updating KYC status:", error);
     return c.json({ error: "Failed to update KYC status" }, { status: 500 });
   }
+});
+
+app.get("/api/admin/audit-log", async (c) => {
+  return c.json({
+    entries: [],
+    pagination: { page: 1, limit: 50, total: 0, hasMore: false }
+  });
 });
 
 // Dashboard compatibility - catch-all for admin routes without v1 prefix
