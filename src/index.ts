@@ -1826,9 +1826,10 @@ app.post("/api/admin/settings", async (c) => {
 app.post("/api/admin/clear-cache", async (c) => {
   try {
     let deleted = 0;
-    if (c.env.KV) {
-      const list = await c.env.KV.list();
-      await Promise.all(list.keys.map((k: { name: string }) => c.env.KV.delete(k.name)));
+    const kv = c.env.KV;
+    if (kv) {
+      const list = await kv.list();
+      await Promise.all(list.keys.map((k: { name: string }) => kv.delete(k.name)));
       deleted = list.keys.length;
     }
     return c.json({ success: true, deleted });
