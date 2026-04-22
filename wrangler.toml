@@ -35,3 +35,8 @@ queue = "creator-platform-notifications-production"
 DOMAIN = "fanzzer.com"
 DASHBOARD_ORIGIN = "https://dashboard.fanzzer.com"
 MAIN_APP_ORIGIN = "https://www.fanzzer.com"
+
+[observability]
+[observability.logs]
+enabled = false
+invocation_logs = true

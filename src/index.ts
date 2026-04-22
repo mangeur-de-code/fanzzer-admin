@@ -87,6 +87,7 @@ const requireAuth = async (c: any, next: any) => {
 // Protect all admin routes
 app.use('/api/admin/*', requireAuth);
 app.use('/api/v1/admin/*', requireAuth);
+app.use('/api/moderation/*', requireAuth);
 
 // Health check — auth required, exposes no service details publicly
 app.get("/health", requireAuth, async (c) => {
@@ -1745,6 +1746,121 @@ app.get("/api/admin/audit-log", async (c) => {
     entries: [],
     pagination: { page: 1, limit: 50, total: 0, hasMore: false }
   });
+});
+
+// User action endpoints
+app.post("/api/admin/ban-user", async (c) => {
+  try {
+    const { userId } = await c.req.json();
+    if (!userId) return c.json({ error: "Missing userId" }, { status: 400 });
+    const db = c.env.DB;
+    if (!db) return c.json({ error: "Database not configured" }, { status: 500 });
+    await db.prepare("UPDATE users SET banned_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(userId).run();
+    return c.json({ success: true, message: `User ${userId} banned` });
+  } catch (error) {
+    console.error("Error banning user:", error);
+    return c.json({ error: "Failed to ban user" }, { status: 500 });
+  }
+});
+
+app.post("/api/admin/promote-user", async (c) => {
+  try {
+    const { userId } = await c.req.json();
+    if (!userId) return c.json({ error: "Missing userId" }, { status: 400 });
+    const db = c.env.DB;
+    if (!db) return c.json({ error: "Database not configured" }, { status: 500 });
+    await db.prepare("UPDATE users SET is_admin = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(userId).run();
+    return c.json({ success: true, message: `User ${userId} promoted` });
+  } catch (error) {
+    console.error("Error promoting user:", error);
+    return c.json({ error: "Failed to promote user" }, { status: 500 });
+  }
+});
+
+app.post("/api/admin/delete-user", async (c) => {
+  try {
+    const { userId } = await c.req.json();
+    if (!userId) return c.json({ error: "Missing userId" }, { status: 400 });
+    const db = c.env.DB;
+    if (!db) return c.json({ error: "Database not configured" }, { status: 500 });
+    await db.prepare("UPDATE users SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(userId).run();
+    return c.json({ success: true, message: `User ${userId} deleted` });
+  } catch (error) {
+    console.error("Error deleting user:", error);
+    return c.json({ error: "Failed to delete user" }, { status: 500 });
+  }
+});
+
+// Platform settings endpoints (persisted in KV)
+app.get("/api/admin/settings", async (c) => {
+  const defaults = {
+    siteName: "fanzzer",
+    maintenanceMode: false,
+    enableSignups: true,
+    creatorVerificationRequired: false,
+    maxUploadSize: 5000,
+    platformFeePercentage: 10,
+  };
+  try {
+    const stored = c.env.KV ? await c.env.KV.get("platform_settings") : null;
+    const settings = stored ? { ...defaults, ...JSON.parse(stored) } : defaults;
+    return c.json({ settings });
+  } catch {
+    return c.json({ settings: defaults });
+  }
+});
+
+app.post("/api/admin/settings", async (c) => {
+  try {
+    const body = await c.req.json();
+    if (c.env.KV) {
+      await c.env.KV.put("platform_settings", JSON.stringify(body));
+    }
+    return c.json({ success: true });
+  } catch (error) {
+    console.error("Error saving settings:", error);
+    return c.json({ error: "Failed to save settings" }, { status: 500 });
+  }
+});
+
+app.post("/api/admin/clear-cache", async (c) => {
+  try {
+    let deleted = 0;
+    if (c.env.KV) {
+      const list = await c.env.KV.list();
+      await Promise.all(list.keys.map((k: { name: string }) => c.env.KV.delete(k.name)));
+      deleted = list.keys.length;
+    }
+    return c.json({ success: true, deleted });
+  } catch (error) {
+    console.error("Error clearing cache:", error);
+    return c.json({ error: "Failed to clear cache" }, { status: 500 });
+  }
+});
+
+// Notifications endpoint
+app.get("/api/admin/notifications", async (c) => {
+  return c.json({ notifications: [] });
+});
+
+// Search endpoint
+app.get("/api/admin/search", async (c) => {
+  const q = c.req.query("q") ?? "";
+  if (!q || !c.env.DB) {
+    return c.json({ results: [] });
+  }
+  try {
+    const like = `%${q}%`;
+    const rows = await c.env.DB.prepare(`
+      SELECT id, COALESCE(display_name, username, email) as name, email, 'user' as type
+      FROM users
+      WHERE deleted_at IS NULL AND (display_name LIKE ? OR username LIKE ? OR email LIKE ?)
+      LIMIT 20
+    `).bind(like, like, like).all();
+    return c.json({ results: rows.results ?? [] });
+  } catch {
+    return c.json({ results: [] });
+  }
 });
 
 // Dashboard compatibility - catch-all for admin routes without v1 prefix
