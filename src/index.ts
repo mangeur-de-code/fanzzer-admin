@@ -682,6 +682,8 @@ app.all("/api/v1/admin/users", async (c) => {
         COALESCE(u.display_name, u.username, u.email) as name,
         u.email,
         u.is_admin,
+        u.banned_at,
+        u.frozen_at,
         u.created_at,
         (SELECT COUNT(*) FROM followers f WHERE f.following_id = u.id) as followers,
         (SELECT COUNT(*) FROM subscriptions s WHERE s.creator_id = u.id AND s.status = 'active') as subscribers,
@@ -698,11 +700,11 @@ app.all("/api/v1/admin/users", async (c) => {
       email: row.email || '',
       role: row.is_admin ? "admin" : "user",
       createdAt: row.created_at,
-      lastActive: row.created_at, // Use created_at as fallback
+      lastActive: row.created_at,
       followers: Number(row.followers) || 0,
       subscribers: Number(row.subscribers) || 0,
       totalSpend: Number(row.total_spend) || 0,
-      status: row.is_admin ? "admin" : "active",
+      status: row.banned_at ? "banned" : row.frozen_at ? "frozen" : row.is_admin ? "admin" : "active",
     }));
 
     return c.json({
@@ -739,6 +741,8 @@ app.all("/api/admin/users", async (c) => {
         COALESCE(u.display_name, u.username, u.email) as name,
         u.email,
         u.is_admin,
+        u.banned_at,
+        u.frozen_at,
         u.created_at,
         (SELECT COUNT(*) FROM followers f WHERE f.following_id = u.id) as followers,
         (SELECT COUNT(*) FROM subscriptions s WHERE s.creator_id = u.id AND s.status = 'active') as subscribers,
@@ -755,11 +759,11 @@ app.all("/api/admin/users", async (c) => {
       email: row.email || '',
       role: row.is_admin ? "admin" : "user",
       createdAt: row.created_at,
-      lastActive: row.created_at, // Use created_at as fallback
+      lastActive: row.created_at,
       followers: Number(row.followers) || 0,
       subscribers: Number(row.subscribers) || 0,
       totalSpend: Number(row.total_spend) || 0,
-      status: row.is_admin ? "admin" : "active",
+      status: row.banned_at ? "banned" : row.frozen_at ? "frozen" : row.is_admin ? "admin" : "active",
     }));
 
     return c.json({
@@ -1748,6 +1752,35 @@ app.get("/api/admin/audit-log", async (c) => {
   });
 });
 
+// Freeze / unfreeze endpoints
+app.post("/api/admin/users/:userId/freeze", async (c) => {
+  try {
+    const userId = c.req.param("userId");
+    if (!userId) return c.json({ error: "Missing userId" }, { status: 400 });
+    const db = c.env.DB;
+    if (!db) return c.json({ error: "Database not configured" }, { status: 500 });
+    await db.prepare("UPDATE users SET frozen_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(userId).run();
+    return c.json({ success: true, message: `User ${userId} frozen` });
+  } catch (error) {
+    console.error("Error freezing user:", error);
+    return c.json({ error: "Failed to freeze user" }, { status: 500 });
+  }
+});
+
+app.post("/api/admin/users/:userId/unfreeze", async (c) => {
+  try {
+    const userId = c.req.param("userId");
+    if (!userId) return c.json({ error: "Missing userId" }, { status: 400 });
+    const db = c.env.DB;
+    if (!db) return c.json({ error: "Database not configured" }, { status: 500 });
+    await db.prepare("UPDATE users SET frozen_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(userId).run();
+    return c.json({ success: true, message: `User ${userId} unfrozen` });
+  } catch (error) {
+    console.error("Error unfreezing user:", error);
+    return c.json({ error: "Failed to unfreeze user" }, { status: 500 });
+  }
+});
+
 // User action endpoints
 app.post("/api/admin/ban-user", async (c) => {
   try {
@@ -1783,7 +1816,12 @@ app.post("/api/admin/delete-user", async (c) => {
     if (!userId) return c.json({ error: "Missing userId" }, { status: 400 });
     const db = c.env.DB;
     if (!db) return c.json({ error: "Database not configured" }, { status: 500 });
-    await db.prepare("UPDATE users SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(userId).run();
+    await db.batch([
+      db.prepare("UPDATE content SET deleted_at = CURRENT_TIMESTAMP WHERE user_id = ? AND deleted_at IS NULL").bind(userId),
+      db.prepare("UPDATE subscriptions SET status = 'cancelled', cancelled_at = CURRENT_TIMESTAMP WHERE creator_id = ? AND status = 'active'").bind(userId),
+      db.prepare("UPDATE subscriptions SET status = 'cancelled', cancelled_at = CURRENT_TIMESTAMP WHERE fan_id = ? AND status = 'active'").bind(userId),
+      db.prepare("UPDATE users SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(userId),
+    ]);
     return c.json({ success: true, message: `User ${userId} deleted` });
   } catch (error) {
     console.error("Error deleting user:", error);
